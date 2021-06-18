@@ -1,0 +1,66 @@
+version: '2.4'
+
+services:
+  php_app:
+    container_name: php_app
+    image: php:8.0-fpm-alpine
+    hostname: php.app
+    mem_reservation: 32m
+    mem_limit: 32m
+
+  nginx:
+    container_name: nginx
+#    image: dtoch/nginx-vts:latest
+    build:
+      context: .
+    ports:
+      - ${INTERNAL_NETWORK_IP:-0.0.0.0}:${NGINX_PORT:-8080}:8080
+    volumes:
+      - ./nginx/conf.d/fpm-monitoring.conf:/etc/nginx/conf.d/fpm-monitoring.conf
+    depends_on:
+      - php_app
+    hostname: nginx.app
+    mem_reservation: 32m
+    mem_limit: 32m
+
+  php_fpm_exporter:
+    container_name: php_fpm_exporter
+    image: bakins/php-fpm-exporter:v0.6.1
+    command: ["--endpoint", "http://nginx:18080/php-fpm-status", "--addr", "0.0.0.0:8080"]
+    ports:
+      - ${INTERNAL_NETWORK_IP:-0.0.0.0}:${PHP_FPM_EXPORTER_PORT:-18080}:8080
+    depends_on:
+      - nginx
+    hostname: php-fpm-exporter.app
+    mem_reservation: 32m
+    mem_limit: 32m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+
+  nginx_exporter:
+    container_name: nginx_exporter
+    image: nginx/nginx-prometheus-exporter:0.9.0
+    command: "-nginx.scrape-uri http://nginx:8000/stub_status"
+    ports:
+      - ${INTERNAL_NETWORK_IP:-0.0.0.0}:${NGINX_EXPORTER_PORT:-16080}:9113
+    depends_on:
+      - nginx
+    hostname: nginx-exporter.app
+    mem_reservation: 32m
+    mem_limit: 32m
+
+  nginx_vts_exporter:
+    container_name: nginx_vts_exporter
+    image: sophos/nginx-vts-exporter:v0.10.7
+    environment:
+      NGINX_STATUS: "http://nginx:8000/status"
+      METRICS_ADDR: ":8000"
+    ports:
+      - ${INTERNAL_NETWORK_IP:-0.0.0.0}:${NGINX_VTS_EXPORTERPORT:-17080}:8000
+    depends_on:
+      - nginx
+    hostname: nginx-vts-exporter.app
+    mem_reservation: 32m
+    mem_limit: 32m

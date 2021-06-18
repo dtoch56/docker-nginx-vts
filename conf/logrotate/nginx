@@ -1,0 +1,13 @@
+# logrotate configuration for nginx
+/var/log/nginx/*.log {
+        weekly
+        missingok
+        rotate 52
+        compress
+        delaycompress
+        notifempty
+        sharedscripts
+        postrotate
+                kill -s USR1 $(cat /run/nginx.pid)
+        endscript
+}
